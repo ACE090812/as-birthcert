@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Birth certificate</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: transparent; font-family: "Segoe UI", Roboto, Arial, sans-serif; overflow: hidden; }
+    #root { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
+    #root.on { display: flex; }
+
+    .wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .from { color: #fff; font-size: 15px; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+
+    .cert {
+        position: relative; width: 620px; max-width: 94vw; padding: 26px 34px 22px; color: #2a2118;
+        font-family: Georgia, "Times New Roman", serif; text-align: center;
+        background: radial-gradient(ellipse at 30% 20%, #fbf5e4 0%, #f2e7c9 70%, #ead9b0 100%);
+        box-shadow: 0 20px 60px rgba(0,0,0,.6);
+        border-radius: 4px;
+    }
+    .cert::before { content: ""; position: absolute; inset: 10px; border: 3px double #8a6a2b; border-radius: 2px; pointer-events: none; }
+    .crest { font-size: 30px; line-height: 1; }
+    .country { margin-top: 4px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #6b5626; }
+    h1 { margin: 8px 0 2px; font-size: 26px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5b1524; }
+    .sub { font-size: 12px; font-style: italic; color: #6b5626; margin-bottom: 14px; }
+    .rule { height: 1px; background: linear-gradient(90deg, transparent, #8a6a2b, transparent); margin: 10px 0; }
+
+    .name { font-size: 30px; font-weight: 700; margin: 6px 0 2px; letter-spacing: .02em; }
+    .name small { display: block; font-size: 10px; font-weight: 400; text-transform: uppercase; letter-spacing: .18em; color: #78633a; margin-bottom: 2px; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; text-align: left; margin: 14px 12px 6px; }
+    .f .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; color: #78633a; }
+    .f .v { font-size: 16px; font-weight: 700; word-break: break-word; }
+    .f .v.mono { font-family: "Courier New", monospace; letter-spacing: .06em; }
+    .f.full { grid-column: 1 / -1; }
+
+    .foot { margin-top: 14px; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 0 12px; }
+    .foot .by { font-size: 12px; font-style: italic; color: #4a3b1d; text-align: left; }
+    .foot .by b { display: block; font-style: normal; font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; color: #78633a; font-weight: 400; }
+    .seal {
+        width: 62px; height: 62px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(circle at 35% 30%, #c23a4d, #7a1526 70%); color: #f5d9a0; font-size: 26px;
+        box-shadow: 0 2px 6px rgba(0,0,0,.4), inset 0 0 0 3px rgba(245,217,160,.35);
+    }
+    .warn { margin-top: 12px; font-size: 9.5px; letter-spacing: .04em; color: #78633a; }
+
+    .actions { display: flex; gap: 10px; }
+    button {
+        font: inherit; font-weight: 600; font-size: 14px; padding: 9px 18px; border-radius: 9px; border: 0; cursor: pointer;
+        background: #fff; color: #1c1917; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+    }
+    button.primary { background: #7a1a31; color: #fff; }
+    button:hover { filter: brightness(1.06); }
+    .hint { color: #e7e5e4; font-size: 12px; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+</style>
+</head>
+<body>
+<div id="root">
+    <div class="wrap">
+        <div class="from" id="from"></div>
+        <div class="cert">
+            <div class="crest">🏛️</div>
+            <div class="country" id="country"></div>
+            <h1>Certificate of Birth</h1>
+            <div class="sub">Certified copy of an entry in the register of births</div>
+            <div class="rule"></div>
+            <div class="name"><small>Name</small><span id="fullname"></span></div>
+            <div class="rule"></div>
+            <div class="grid">
+                <div class="f"><div class="k">Date of birth</div><div class="v" id="dob"></div></div>
+                <div class="f"><div class="k">Sex</div><div class="v" id="sex"></div></div>
+                <div class="f"><div class="k">Place of birth</div><div class="v" id="place"></div></div>
+                <div class="f"><div class="k">Registration district</div><div class="v" id="district"></div></div>
+                <div class="f"><div class="k">Certificate no.</div><div class="v mono" id="number"></div></div>
+                <div class="f"><div class="k">Date of issue</div><div class="v" id="issued"></div></div>
+            </div>
+            <div class="foot">
+                <div class="by"><b>Issued by</b><span id="by"></span></div>
+                <div class="seal">★</div>
+            </div>
+            <div class="warn">Roleplay use only. Copies are issued on request.</div>
+        </div>
+        <div class="actions">
+            <button class="primary" id="show">Show to person nearby</button>
+            <button id="close">Close</button>
+        </div>
+        <div class="hint">Press Esc to close</div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var root = document.getElementById('root');
+    var current = null;
+    var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    function $(id) { return document.getElementById(id); }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+    function parseDob(s) {
+        s = String(s || '').trim();
+        var a = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s);
+        if (a) return { y: +a[1], m: +a[2], d: +a[3] };
+        var b = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/.exec(s);
+        if (b) return { y: +b[3], m: +b[2], d: +b[1] };
+        return null;
+    }
+    function dobText(s) {
+        var p = parseDob(s);
+        return p && p.m >= 1 && p.m <= 12 ? p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y : (s || '-');
+    }
+    function dateText(ts) {
+        if (!ts) return '-';
+        var d = new Date(ts * 1000);
+        return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    }
+    function sexText(s) { return s === 'M' ? 'Male' : s === 'F' ? 'Female' : '-'; }
+
+    function show(msg) {
+        var c = msg.card;
+        current = c;
+        $('country').textContent = c.countryName || '';
+        $('fullname').textContent = ((c.first || '') + ' ' + (c.last || '')).trim();
+        $('dob').textContent = dobText(c.dob);
+        $('sex').textContent = sexText(c.sex);
+        $('place').textContent = c.placeOfBirth || '-';
+        $('district').textContent = c.district || '-';
+        $('number').textContent = c.number || '';
+        $('issued').textContent = dateText(c.issuedAt);
+        $('by').textContent = c.issuedBy || '';
+        $('from').textContent = msg.from ? msg.from + ' shows you their birth certificate' : '';
+        $('show').style.display = msg.own ? '' : 'none';
+        root.className = 'on';
+    }
+
+    function post(name, data) {
+        try {
+            fetch('https://' + (typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'as-birthcert') + '/' + name, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}),
+            }).catch(function () {});
+        } catch (e) {}
+    }
+    function hide() { root.className = ''; current = null; }
+    function closeAndTell() { hide(); post('close'); }
+
+    window.addEventListener('message', function (e) {
+        var m = e.data || {};
+        if (m.action === 'open' && m.card) show(m);
+        else if (m.action === 'close') hide();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' || e.key === 'Backspace') closeAndTell(); });
+    $('close').onclick = closeAndTell;
+    $('show').onclick = function () { if (current) post('showNearby', { number: current.number }); };
+    root.addEventListener('mousedown', function (e) { if (e.target === root) closeAndTell(); });
+})();
+</script>
+</body>
+</html>
