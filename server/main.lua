@@ -77,7 +77,7 @@ local function itemMetadata(row)
         number = row.number,
         holder = ('%s %s'):format(row.first_name, row.last_name),
         dob = row.dob,
-        description = ('Birth certificate %s, %s %s'):format(row.number, row.first_name, row.last_name),
+        description = T('item.description', row.number, row.first_name, row.last_name),
     }
 end
 
@@ -134,12 +134,12 @@ end
 
 --- Returns nil when the character may order, or a reason.
 local function refusal(cid, pending)
-    if pending then return 'You already have a birth certificate order in progress.' end
+    if pending then return T('err.alreadyPending') end
     local cd = tonumber(Config.cooldownSeconds) or 0
     if cd > 0 then
         local wait = lastOrderTime(cid) + cd - now()
         if wait > 0 then
-            return ('You ordered a certificate recently. Please wait %d minute(s) before ordering another.'):format(math.ceil(wait / 60))
+            return T('err.cooldown', math.ceil(wait / 60))
         end
     end
     return nil
@@ -147,7 +147,7 @@ end
 
 local function getState(src)
     local cid = Bridge.getIdentifier(src)
-    if not cid then return nil, 'You are not signed in.' end
+    if not cid then return nil, T('err.notSignedIn') end
     local pending = pendingRow(cid)
     local why = refusal(cid, pending)
     local info = Bridge.getCharInfo(src)
@@ -180,7 +180,7 @@ local busy = {}
 
 local function order(src, data)
     local cid = Bridge.getIdentifier(src)
-    if not cid then return nil, 'You are not signed in.' end
+    if not cid then return nil, T('err.notSignedIn') end
 
     local why = refusal(cid, pendingRow(cid))
     if why then return nil, why end
@@ -189,17 +189,17 @@ local function order(src, data)
     local lockerId
     if mode == 'locker' then
         lockerId = tostring(data.lockerId or '')
-        if not lockerLabel(lockerId) then return nil, 'Choose where to collect your certificate.' end
+        if not lockerLabel(lockerId) then return nil, T('err.chooseLocker') end
     end
 
     local info = Bridge.getCharInfo(src)
-    if (info.first or '') == '' then return nil, 'We could not read your character details.' end
+    if (info.first or '') == '' then return nil, T('err.noCharInfo') end
 
     local number = newNumber()
-    if not number then return nil, 'We could not create a certificate number. Please try again.' end
+    if not number then return nil, T('err.noNumber') end
 
     if not Bridge.removeMoney(src, Config.account, Config.price, 'birth-certificate') then
-        return nil, 'You do not have enough money in your bank account.'
+        return nil, T('err.noMoney')
     end
 
     local ordered = now()
@@ -212,20 +212,19 @@ local function order(src, data)
     end)
     if not ok or not id then
         Bridge.addMoney(src, Config.account, Config.price, 'birth-certificate-refund')
-        return nil, 'We could not process your order. You have not been charged, please try again.'
+        return nil, T('err.orderFailed')
     end
 
     pcall(function()
         exports['sd-phone']:addBankTransaction(cid, {
-            label = 'Birth certificate', amount = -Config.price, category = 'government', counterparty = Config.issuedBy,
+            label = T('item.label'), amount = -Config.price, category = 'government', counterparty = Config.issuedBy,
         })
     end)
     local name = Bridge.getCharacterName(src)
-    Bridge.sendPhoneMail(src, cid, Config.mailFrom, 'We have received your birth certificate order',
-        ('Hello %s,\n\nWe have received your order for a birth certificate and your payment of %s%d.\n\nIt will be ready at %s. We will email you when it has been sent to you.'):format(
-            name, Config.currency, Config.price, os.date('%d %b %Y %H:%M', ordered + (Config.waitSeconds or 0))))
-    discordLog('Birth certificate ordered', 0x2563eb, {
-        { 'Character', name }, { 'Citizen ID', cid }, { 'Paid', Config.currency .. Config.price }, { 'Number', number },
+    Bridge.sendPhoneMail(src, cid, Config.mailFrom, T('mail.received.subject'),
+        T('mail.received.body', name, Config.currency, Config.price, os.date('%d %b %Y %H:%M', ordered + (Config.waitSeconds or 0))))
+    discordLog(T('discord.ordered'), 0x2563eb, {
+        { T('discord.character'), name }, { T('discord.citizenId'), cid }, { T('discord.paid'), Config.currency .. Config.price }, { T('discord.number'), number },
     })
 
     return { price = Config.price, readyAt = ordered + (Config.waitSeconds or 0), now = ordered, number = number }
@@ -254,7 +253,7 @@ local function deliver(row)
             return exports['as-postalprime']:createParcel(cid, {
                 ref = row.number, sender = Config.delivery.sender, lockerId = lockerId,
                 prepSeconds = Config.delivery.prepSeconds, expireSeconds = Config.delivery.expireSeconds,
-                items = { { item = Config.item, label = 'Birth certificate', icon = '📜', qty = 1, metadata = itemMetadata(row) } },
+                items = { { item = Config.item, label = T('item.label'), icon = '📜', qty = 1, metadata = itemMetadata(row) } },
             })
         end)
         if not ok then log('createParcel failed: %s', tostring(sent)); return false end
@@ -263,12 +262,12 @@ local function deliver(row)
             return false
         end
         markIssued(row, false)
-        local label = lockerLabel(lockerId) or 'your locker'
+        local label = lockerLabel(lockerId) or T('misc.yourLocker')
         local src = Bridge.findSource(cid)
-        Bridge.phoneNotify(src, 'Birth certificate sent', ('Your birth certificate has been sent to %s.'):format(label))
-        Bridge.sendPhoneMail(src, cid, Config.mailFrom, 'Your birth certificate is on its way',
-            ('Hello %s,\n\nYour birth certificate has been sent to %s. Open Postal Prime for your pickup code, then collect it from the locker.\n\nCertificate number: %s'):format(name, label, row.number))
-        discordLog('Birth certificate sent', 0x16a34a, { { 'Number', row.number }, { 'Character', name }, { 'Citizen ID', cid }, { 'Sent to', label } })
+        Bridge.phoneNotify(src, T('phone.sent.title'), T('phone.sent.body', label))
+        Bridge.sendPhoneMail(src, cid, Config.mailFrom, T('mail.sent.subject'),
+            T('mail.sent.body', name, label, row.number))
+        discordLog(T('discord.sent'), 0x16a34a, { { T('discord.number'), row.number }, { T('discord.character'), name }, { T('discord.citizenId'), cid }, { T('discord.sentTo'), label } })
         return true
     end
 
@@ -279,10 +278,10 @@ local function deliver(row)
         return false
     end
     markIssued(row, true)
-    Bridge.phoneNotify(src, 'Birth certificate issued', 'Your birth certificate has been added to your inventory.')
-    Bridge.sendPhoneMail(src, cid, Config.mailFrom, 'Your birth certificate has been issued',
-        ('Hello %s,\n\nYour birth certificate is ready and is in your inventory.\n\nCertificate number: %s'):format(name, row.number))
-    discordLog('Birth certificate issued', 0x16a34a, { { 'Number', row.number }, { 'Character', name }, { 'Citizen ID', cid }, { 'Sent to', 'Inventory' } })
+    Bridge.phoneNotify(src, T('phone.issued.title'), T('phone.issued.body'))
+    Bridge.sendPhoneMail(src, cid, Config.mailFrom, T('mail.issued.subject'),
+        T('mail.issued.body', name, row.number))
+    discordLog(T('discord.issued'), 0x16a34a, { { T('discord.number'), row.number }, { T('discord.character'), name }, { T('discord.citizenId'), cid }, { T('discord.sentTo'), T('discord.inventory') } })
     return true
 end
 
@@ -303,7 +302,7 @@ AddEventHandler('as-postalprime:parcelCollected', function(cid, ref)
     local row = byNumber(tostring(ref or ''))
     if not row or row.citizenid ~= cid then return end
     MySQL.update.await('UPDATE as_birth_certs SET collected = 1 WHERE id = ?', { row.id })
-    discordLog('Birth certificate collected', 0x0ea5e9, { { 'Number', row.number }, { 'Citizen ID', cid } })
+    discordLog(T('discord.collected'), 0x0ea5e9, { { T('discord.number'), row.number }, { T('discord.citizenId'), cid } })
 end)
 
 AddEventHandler('as-postalprime:parcelExpired', function(cid, ref)
@@ -358,11 +357,16 @@ RegisterNetEvent('as-birthcert:server:show', function(number)
         end
     end
     if not best then
-        TriggerClientEvent('ox_lib:notify', src, { title = 'Birth certificate', description = 'There is nobody close enough.', type = 'error' })
+        TriggerClientEvent('ox_lib:notify', src, { title = T('toast.title'), description = T('toast.nobodyClose'), type = 'error' })
         return
     end
     TriggerClientEvent('as-birthcert:client:showCard', best, toCard(row), Bridge.getCharacterName(src))
-    TriggerClientEvent('ox_lib:notify', src, { title = 'Birth certificate', description = 'You showed your birth certificate.', type = 'success' })
+    TriggerClientEvent('ox_lib:notify', src, { title = T('toast.title'), description = T('toast.showed'), type = 'success' })
+end)
+
+-- config.lua is server only, so the client asks which language to use.
+lib.callback.register('as-birthcert:locale', function()
+    return Config.locale or 'en'
 end)
 
 Bridge.registerUsable(Config.item, function(source, item)
@@ -378,12 +382,12 @@ exports('getState', getState)
 
 --- For the gov site: order a certificate. data = { lockerId = '...' }. Returns a result or nil, message.
 exports('order', function(src, data)
-    if type(src) ~= 'number' or type(data) ~= 'table' then return nil, 'Bad request.' end
-    if busy[src] then return nil, 'Please wait, your last request is still being processed.' end
+    if type(src) ~= 'number' or type(data) ~= 'table' then return nil, T('err.badRequest') end
+    if busy[src] then return nil, T('err.busy') end
     busy[src] = true
     local ok, res, err = pcall(order, src, data)
     busy[src] = nil
-    if not ok then log('order failed: %s', tostring(res)); return nil, 'Something went wrong. Please try again.' end
+    if not ok then log('order failed: %s', tostring(res)); return nil, T('err.generic') end
     return res, err
 end)
 

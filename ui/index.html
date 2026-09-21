@@ -62,38 +62,64 @@
         <div class="cert">
             <div class="crest">🏛️</div>
             <div class="country" id="country"></div>
-            <h1>Certificate of Birth</h1>
-            <div class="sub">Certified copy of an entry in the register of births</div>
+            <h1 data-i18n="card.title">Certificate of Birth</h1>
+            <div class="sub" data-i18n="card.subtitle">Certified copy of an entry in the register of births</div>
             <div class="rule"></div>
-            <div class="name"><small>Name</small><span id="fullname"></span></div>
+            <div class="name"><small data-i18n="card.name">Name</small><span id="fullname"></span></div>
             <div class="rule"></div>
             <div class="grid">
-                <div class="f"><div class="k">Date of birth</div><div class="v" id="dob"></div></div>
-                <div class="f"><div class="k">Sex</div><div class="v" id="sex"></div></div>
-                <div class="f"><div class="k">Place of birth</div><div class="v" id="place"></div></div>
-                <div class="f"><div class="k">Registration district</div><div class="v" id="district"></div></div>
-                <div class="f"><div class="k">Certificate no.</div><div class="v mono" id="number"></div></div>
-                <div class="f"><div class="k">Date of issue</div><div class="v" id="issued"></div></div>
+                <div class="f"><div class="k" data-i18n="card.dob">Date of birth</div><div class="v" id="dob"></div></div>
+                <div class="f"><div class="k" data-i18n="card.sex">Sex</div><div class="v" id="sex"></div></div>
+                <div class="f"><div class="k" data-i18n="card.place">Place of birth</div><div class="v" id="place"></div></div>
+                <div class="f"><div class="k" data-i18n="card.district">Registration district</div><div class="v" id="district"></div></div>
+                <div class="f"><div class="k" data-i18n="card.number">Certificate no.</div><div class="v mono" id="number"></div></div>
+                <div class="f"><div class="k" data-i18n="card.issued">Date of issue</div><div class="v" id="issued"></div></div>
             </div>
             <div class="foot">
-                <div class="by"><b>Issued by</b><span id="by"></span></div>
+                <div class="by"><b data-i18n="card.issuedBy">Issued by</b><span id="by"></span></div>
                 <div class="seal">★</div>
             </div>
-            <div class="warn">Roleplay use only. Copies are issued on request.</div>
+            <div class="warn" data-i18n="card.warning">Roleplay use only. Copies are issued on request.</div>
         </div>
         <div class="actions">
-            <button class="primary" id="show">Show to person nearby</button>
-            <button id="close">Close</button>
+            <button class="primary" id="show" data-i18n="card.show">Show to person nearby</button>
+            <button id="close" data-i18n="card.close">Close</button>
         </div>
-        <div class="hint">Press Esc to close</div>
+        <div class="hint" data-i18n="card.escHint">Press Esc to close</div>
     </div>
 </div>
 
 <script>
 (function () {
+    var RESOURCE = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'as-birthcert';
+
+    // ---- locale (the client script answers the 'locale' callback with the chosen language) ----
+    var I18N = {};
+    var localeReady = false;
+    function t(key) {
+        var s = Object.prototype.hasOwnProperty.call(I18N, key) ? I18N[key] : key;
+        var args = Array.prototype.slice.call(arguments, 1), i = 0;
+        return String(s).replace(/%[sd]/g, function () { return i < args.length ? args[i++] : ''; });
+    }
+    function applyI18n(root) {
+        root = root || document;
+        root.querySelectorAll('[data-i18n]').forEach(function (el) { if (I18N[el.dataset.i18n] != null) el.textContent = t(el.dataset.i18n); });
+        ['placeholder', 'title', 'aria-label'].forEach(function (a) {
+            root.querySelectorAll('[data-i18n-' + a + ']').forEach(function (el) {
+                var k = el.getAttribute('data-i18n-' + a); if (I18N[k] != null) el.setAttribute(a, t(k));
+            });
+        });
+    }
+    function loadLocale(cb) {
+        fetch('https://' + RESOURCE + '/locale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && typeof d === 'object') { I18N = d; localeReady = true; } applyI18n(); if (cb) cb(); })
+            .catch(function () { if (cb) cb(); });
+    }
+
     var root = document.getElementById('root');
     var current = null;
-    var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    function months() { return t('meta.months').split(','); }
 
     function $(id) { return document.getElementById(id); }
     function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -108,14 +134,14 @@
     }
     function dobText(s) {
         var p = parseDob(s);
-        return p && p.m >= 1 && p.m <= 12 ? p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y : (s || '-');
+        return p && p.m >= 1 && p.m <= 12 ? p.d + ' ' + months()[p.m - 1] + ' ' + p.y : (s || '-');
     }
     function dateText(ts) {
         if (!ts) return '-';
         var d = new Date(ts * 1000);
-        return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+        return d.getDate() + ' ' + months()[d.getMonth()] + ' ' + d.getFullYear();
     }
-    function sexText(s) { return s === 'M' ? 'Male' : s === 'F' ? 'Female' : '-'; }
+    function sexText(s) { return s === 'M' ? t('card.male') : s === 'F' ? t('card.female') : '-'; }
 
     function show(msg) {
         var c = msg.card;
@@ -129,14 +155,14 @@
         $('number').textContent = c.number || '';
         $('issued').textContent = dateText(c.issuedAt);
         $('by').textContent = c.issuedBy || '';
-        $('from').textContent = msg.from ? msg.from + ' shows you their birth certificate' : '';
+        $('from').textContent = msg.from ? t('card.shownBy', msg.from) : '';
         $('show').style.display = msg.own ? '' : 'none';
         root.className = 'on';
     }
 
     function post(name, data) {
         try {
-            fetch('https://' + (typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'as-birthcert') + '/' + name, {
+            fetch('https://' + RESOURCE + '/' + name, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}),
             }).catch(function () {});
         } catch (e) {}
@@ -146,13 +172,16 @@
 
     window.addEventListener('message', function (e) {
         var m = e.data || {};
-        if (m.action === 'open' && m.card) show(m);
+        if (m.action === 'open' && m.card) {
+            if (localeReady) show(m); else loadLocale(function () { show(m); });
+        }
         else if (m.action === 'close') hide();
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' || e.key === 'Backspace') closeAndTell(); });
     $('close').onclick = closeAndTell;
     $('show').onclick = function () { if (current) post('showNearby', { number: current.number }); };
     root.addEventListener('mousedown', function (e) { if (e.target === root) closeAndTell(); });
+    loadLocale();
 })();
 </script>
 </body>

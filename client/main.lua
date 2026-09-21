@@ -3,6 +3,26 @@
 
 local isOpen = false
 
+-- config.lua is server only, so the language comes from the server (see shared/locale.lua).
+Config = Config or {}
+local localeLoaded = false
+local function fetchLocale()
+    if localeLoaded then return end
+    local ok, code = pcall(function() return lib.callback.await('as-birthcert:locale', false) end)
+    if ok and type(code) == 'string' and code ~= '' then
+        Config.locale = code
+        localeLoaded = true
+    end
+end
+
+CreateThread(function()
+    for _ = 1, 30 do
+        fetchLocale()
+        if localeLoaded then return end
+        Wait(2000)
+    end
+end)
+
 local function close()
     if not isOpen then return end
     isOpen = false
@@ -28,14 +48,15 @@ end
 
 RegisterNetEvent('as-birthcert:client:useItem', function(item)
     if isOpen then return end
+    fetchLocale()
     local number = numberFrom(item)
     if not number then
-        lib.notify({ title = 'Birth certificate', description = 'This certificate is not readable.', type = 'error' })
+        lib.notify({ title = T('toast.title'), description = T('toast.notReadable'), type = 'error' })
         return
     end
     local card = lib.callback.await('as-birthcert:card', false, number)
     if not card then
-        lib.notify({ title = 'Birth certificate', description = 'This certificate is not readable.', type = 'error' })
+        lib.notify({ title = T('toast.title'), description = T('toast.notReadable'), type = 'error' })
         return
     end
     openCard(card, { own = true })
@@ -44,6 +65,11 @@ end)
 RegisterNetEvent('as-birthcert:client:showCard', function(card, fromName)
     if isOpen then close() end
     openCard(card, { own = false, from = fromName })
+end)
+
+RegisterNUICallback('locale', function(_, cb)
+    fetchLocale()
+    cb(LocaleDict())
 end)
 
 RegisterNUICallback('close', function(_, cb)
